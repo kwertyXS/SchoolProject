@@ -10,6 +10,11 @@ def login():
 def register():
     return render_template('register.html')
 
+@app.route('/api/registration', methods=["POST"])
+def db_register():
+    return ...
+
 
 if __name__ == '__main__':
     app.run(debug=True)
+
