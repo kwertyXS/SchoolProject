@@ -10,9 +10,9 @@ def login():
 def register():
     return render_template('register.html')
 
-@app.route('/api/registration', methods=["POST"])
+@app.route('/api/register', methods=["POST"])
 def db_register():
-    return ...
+    return "1"
 
 
 if __name__ == '__main__':
