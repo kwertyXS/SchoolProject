@@ -3,3 +3,4 @@ github.pub
 .venv/
 .env
 __pycache__/
+.idea/
