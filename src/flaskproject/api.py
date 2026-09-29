@@ -7,8 +7,10 @@ from flask import Blueprint, request, abort, g, jsonify
 from .db import get_connection
 from .tokens import create_token, login_required, set_token_cookie
 
-bp = Blueprint('api', __name__, url_prefix='/api')
+import requests
 
+bp = Blueprint('api', __name__, url_prefix='/api')
+OPEN_ROUTER_API = os.getenv("OPEN_ROUTER_API")
 
 def hash_password(password, salt=None):
     if salt is None:
@@ -114,3 +116,64 @@ def me():
         abort(401)
 
     return {"result": True, "user": user}
+
+
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+# конкретные чат-модели: openrouter/free иногда попадает на модель-модератор,
+# которая вместо ответа пишет "User Safety: safe". Если первая недоступна — берётся следующая
+CHAT_MODELS = [
+    "google/gemma-4-31b-it:free",
+    "qwen/qwen3.8-27b:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+]
+MAX_HISTORY = 20  # сколько последних сообщений отправлять модели
+
+
+@bp.route('/chat', methods=['POST'])
+@login_required
+def chat():
+    if not OPEN_ROUTER_API:
+        return error('OPEN_ROUTER_API не задан в .env', 500)
+
+    req = request.get_json(silent=True) or {}
+
+    # страница шлёт всю историю в messages: [{role, content}, ...], последнее — от пользователя
+    history = req.get('messages')
+    if not isinstance(history, list):
+        history = [{"role": "user", "content": req.get('message')}]
+
+    messages = [
+        {"role": m["role"], "content": m["content"]}
+        for m in history
+        if isinstance(m, dict)
+        and m.get("role") in ("user", "assistant")
+        and isinstance(m.get("content"), str)
+        and m["content"].strip()
+    ][-MAX_HISTORY:]
+    if not messages or messages[-1]["role"] != "user":
+        return error('Пустое сообщение', 400)
+
+    try:
+        response = requests.post(
+            OPENROUTER_URL,
+            headers={"Authorization": f"Bearer {OPEN_ROUTER_API}"},
+            json={"models": CHAT_MODELS, "messages": messages},
+            timeout=60,
+        )
+        data = response.json()
+    except requests.Timeout:
+        return error('ИИ не ответил вовремя, попробуйте ещё раз', 504)
+    except (requests.RequestException, ValueError):
+        return error('Не удалось связаться с ИИ', 502)
+
+    if not response.ok or "error" in data:
+        err = data.get("error")
+        message = (err.get("message") if isinstance(err, dict) else err) or f"код {response.status_code}"
+        return error(f'Ошибка ИИ: {message}', 502)
+
+    try:
+        reply = data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        return error('ИИ вернул пустой ответ', 502)
+
+    return {"result": True, "reply": reply}
