@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="{{ url_for('static', filename='js/support.js') }}"></script>
+</head>
+<body>
+{# {{ }} ниже — синтаксис support.js, а не Jinja #}
+{% raw %}
+<x-dc>
+<helmet>
+<style>
+body { margin: 0; font-family: Arial, sans-serif; background-color: #f0f2f5; }
+a { color: #007bff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+@keyframes dcblink { 0%,80%,100% { opacity: .2 } 40% { opacity: 1 } }
+</style>
+</helmet>
+<div style="height: 100vh; display: flex; flex-direction: column; box-sizing: border-box;">
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.08); position: relative; z-index: 5;">
+    <div style="font-size: 18px; font-weight: bold; color: #333;">ИИ-ассистент</div>
+    <div onMouseEnter="{{ openMenu }}" onMouseLeave="{{ closeMenu }}" style="position: relative;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 8px; cursor: pointer; background: #f0f2f5;">
+        <div style="width: 34px; height: 34px; border-radius: 50%; background: #007bff; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 15px;">{{ initial }}</div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <div style="font-size: 14px; color: #333;">{{ userName }}</div>
+          <div style="font-size: 13px; color: #666; display: flex; gap: 4px;">
+            <span>Баланс:</span>
+            <span style="font-weight: bold; color: {{ balanceColor }};">{{ balanceLabel }}</span>
+          </div>
+        </div>
+      </div>
+      <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; right: 0; top: 100%; padding-top: 8px; width: 260px;">
+          <div style="background: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.04); padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+            <div>
+              <div style="font-size: 15px; color: #333; font-weight: bold;">{{ userName }}</div>
+              <div style="font-size: 13px; color: #666; margin-top: 2px;">{{ userEmail }}</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px; background: #f0f2f5; border-radius: 8px;">
+              <span style="font-size: 13px; color: #666;">Баланс</span>
+              <span style="font-size: 20px; font-weight: bold; color: {{ balanceColor }};">{{ balanceLabel }}</span>
+            </div>
+            <button onClick="{{ buy }}" style="width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 15px;" style-hover="background-color: #0056b3;">Купить коины</button>
+            <button onClick="{{ logout }}" style="width: 100%; padding: 10px; background-color: white; color: #d9363e; border: 1px solid #ccc; border-radius: 5px; cursor: pointer; font-size: 15px;" style-hover="background-color: #fdf1f1; border-color: #d9363e;">Выйти</button>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </header>
+
+  <main style="flex: 1; min-height: 0; display: flex; justify-content: center; padding: 20px;">
+    <div style="width: 100%; max-width: 800px; background: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden;">
+      <div ref="{{ listRef }}" style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+        <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="margin: auto; text-align: center; color: #666; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 22px; color: #333; font-weight: bold;">Чем могу помочь?</div>
+            <div style="font-size: 15px;">Задайте вопрос — ИИ ответит в этом окне.</div>
+          </div>
+        </sc-if>
+        <sc-for list="{{ messages }}" as="m" hint-placeholder-count="0">
+          <div style="display: flex; justify-content: {{ m.align }};">
+            <div style="max-width: 75%; padding: 10px 14px; border-radius: 10px; font-size: 15px; line-height: 1.45; white-space: pre-wrap; background: {{ m.bg }}; color: {{ m.fg }};">{{ m.text }}</div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex;">
+            <div style="padding: 10px 14px; border-radius: 10px; background: #f0f2f5; color: #666; font-size: 15px;">{{ dots }}</div>
+          </div>
+        </sc-if>
+      </div>
+      <sc-if value="{{ limitReached }}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 10px 24px; background: #fff4e5; color: #8a5300; font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+          <span>Недостаточно средств на балансе.</span>
+          <a href="#" onClick="{{ buy }}">Купить коины</a>
+        </div>
+      </sc-if>
+      <div style="border-top: 1px solid #e4e7eb; padding: 14px; display: flex; gap: 10px; align-items: flex-end;">
+        <textarea value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onKey }}" disabled="{{ limitReached }}" rows="1" placeholder="Введите сообщение…" style="flex: 1; resize: none; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-family: Arial, sans-serif; font-size: 15px; min-height: 42px; max-height: 160px; outline: none;" style-focus="border-color: #007bff;"></textarea>
+        <button onClick="{{ send }}" disabled="{{ sendDisabled }}" style="padding: 10px 20px; height: 42px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;" style-hover="background-color: #0056b3;" style-disabled="background-color: #9cc5f5; cursor: default;">Отправить</button>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;lowBalance&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:50,&quot;min&quot;:0,&quot;max&quot;:10000,&quot;tsType&quot;:&quot;number&quot;},&quot;subscribeUrl&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;/buy&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { menuOpen: false, messages: [], draft: '', loading: false, balance: null, currency: '₽', name: '', email: '' };
+  listRef = React.createRef();
+  componentDidMount() { this.loadBalance(); }
+  componentDidUpdate() {
+    const el = this.listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }
+  async loadBalance() {
+    try {
+      const res = await fetch('/api/balance', { credentials: 'same-origin' });
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      if (!res.ok) { this.setState({ balanceError: true }); return; }
+      const b = await res.json();
+      this.setState(s => ({
+        balanceError: false,
+        balance: typeof b.balance === 'number' ? b.balance : s.balance,
+        currency: b.currency || s.currency,
+        name: b.name || s.name,
+        email: b.email || s.email
+      }));
+    } catch (e) { this.setState({ balanceError: true }); }
+  }
+  async send() {
+    const text = this.state.draft.trim();
+    if (!text || this.state.loading || (this.state.balance !== null && this.state.balance <= 0)) return;
+    const history = [...this.state.messages, { role: 'user', text }];
+    this.setState({ messages: history, draft: '', loading: true });
+    let reply;
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ message: text, messages: history.map(m => ({ role: m.role, content: m.text })) })
+      });
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      const ct = res.headers.get('content-type') || '';
+      const body = ct.includes('application/json') ? await res.json() : { reply: await res.text() };
+      if (res.status === 402) reply = body.message || 'Недостаточно средств на балансе.';
+      else if (!res.ok) reply = 'Ошибка: ' + (body.message || body.error || res.status);
+      else reply = body.reply ?? body.message ?? body.content ?? '';
+      if (typeof body.balance === 'number') this.setState({ balance: body.balance });
+      else this.loadBalance();
+    } catch (e) { reply = 'Ошибка: сервер недоступен.'; }
+    this.setState(s => ({ messages: [...s.messages, { role: 'assistant', text: reply }], loading: false }));
+  }
+  renderVals() {
+    const { balance, currency, name, email } = this.state;
+    const noFunds = balance !== null && balance <= 0;
+    const low = balance !== null && balance < (this.props.lowBalance ?? 50);
+    const fmt = balance !== null ? balance.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ' + currency
+      : this.state.balanceError ? 'нет связи' : 'загрузка…';
+    return {
+      menuOpen: this.state.menuOpen,
+      openMenu: () => this.setState({ menuOpen: true }),
+      closeMenu: () => this.setState({ menuOpen: false }),
+      userName: name || 'Аккаунт',
+      userEmail: email,
+      initial: (name || 'А').trim().charAt(0).toUpperCase(),
+      balanceLabel: fmt,
+      balanceColor: balance === null ? '#888' : noFunds ? '#d9363e' : low ? '#e08a00' : '#28a745',
+      buy: (e) => { e && e.preventDefault(); window.location.href = this.props.subscribeUrl ?? '/buy'; },
+      logout: () => { window.location.href = '/logout'; },
+      listRef: this.listRef,
+      isEmpty: this.state.messages.length === 0 && !this.state.loading,
+      messages: this.state.messages.map(m => m.role === 'user'
+        ? { text: m.text, align: 'flex-end', bg: '#007bff', fg: 'white' }
+        : { text: m.text, align: 'flex-start', bg: '#f0f2f5', fg: '#333' }),
+      loading: this.state.loading,
+      dots: 'ИИ печатает…',
+      limitReached: noFunds,
+      draft: this.state.draft,
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+      onKey: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.send(); } },
+      send: () => this.send(),
+      sendDisabled: noFunds || this.state.loading || !this.state.draft.trim()
+    };
+  }
+}
+</script>
+{% endraw %}
+</body>
+</html>

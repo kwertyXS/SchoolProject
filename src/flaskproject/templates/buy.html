@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="{{ url_for('static', filename='js/support.js') }}"></script>
+</head>
+<body>
+{# {{ }} ниже — синтаксис support.js, а не Jinja #}
+{% raw %}
+<x-dc>
+<helmet>
+<style>
+body { margin: 0; font-family: Arial, sans-serif; background-color: #f0f2f5; }
+a { color: #007bff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;">
+  <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 100%; max-width: 350px; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px;">
+    <h2 style="text-align: center; margin: 0 0 5px; color: #333;">Пополнение баланса</h2>
+    <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px; background: #f0f2f5; border-radius: 8px;">
+      <span style="font-size: 14px; color: #666;">Текущий баланс</span>
+      <span style="font-size: 18px; font-weight: bold; color: #333;">{{ balanceLabel }}</span>
+    </div>
+    <div>
+      <label style="display: block; margin-bottom: 5px; color: #666;">Количество коинов</label>
+      <input type="number" min="1" step="1" value="{{ coins }}" onChange="{{ onCoins }}" onKeyDown="{{ onKey }}" placeholder="Например, 500" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; outline: none;" style-focus="border-color: #007bff;"></input>
+    </div>
+    <button onClick="{{ buy }}" disabled="{{ buyDisabled }}" style="width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;" style-hover="background-color: #0056b3;" style-disabled="background-color: #9cc5f5; cursor: default;">{{ buttonLabel }}</button>
+    <sc-if value="{{ hasMessage }}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 10px; border-radius: 5px; font-size: 14px; text-align: center; background: {{ msgBg }}; color: {{ msgColor }}; border: 1px solid {{ msgBorder }};">{{ message }}</div>
+    </sc-if>
+    <div style="text-align: center; font-size: 14px;">
+      <a href="/chat">← Вернуться в чат</a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { coins: '', loading: false, message: '', msgType: '', balance: null, currency: 'коинов', balanceError: false };
+  componentDidMount() { this.loadBalance(); }
+  async loadBalance() {
+    try {
+      const res = await fetch('/api/balance', { credentials: 'same-origin' });
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      if (!res.ok) { this.setState({ balanceError: true }); return; }
+      const b = await res.json();
+      if (typeof b.balance === 'number') this.setState({ balance: b.balance, currency: b.currency || this.state.currency });
+    } catch (e) { this.setState({ balanceError: true }); }
+  }
+  async buy() {
+    const coins = parseInt(this.state.coins, 10);
+    if (!coins || coins < 1) { this.setState({ message: 'Введите количество коинов', msgType: 'error' }); return; }
+    this.setState({ loading: true, message: '' });
+    try {
+      const res = await fetch('/api/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ coins })
+      });
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      let body = {};
+      try { body = await res.json(); } catch (_) {}
+      const url = body.url || body.payment_url || body.redirect;
+      if (res.ok && url) {
+        this.setState({ message: 'Переход к оплате…', msgType: 'success' });
+        window.location.href = url;
+        return;
+      }
+      this.setState({ message: body.message || body.error || 'Ошибка ' + res.status, msgType: 'error', loading: false });
+    } catch (e) {
+      this.setState({ message: 'Сервер недоступен. Попробуйте позже.', msgType: 'error', loading: false });
+    }
+  }
+  renderVals() {
+    const { balance, currency, balanceError, msgType, loading, coins } = this.state;
+    const ok = msgType === 'success';
+    return {
+      balanceLabel: balance !== null ? balance.toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ' + currency : balanceError ? 'нет связи' : 'загрузка…',
+      coins,
+      onCoins: (e) => this.setState({ coins: e.target.value.replace(/[^0-9]/g, ''), message: '' }),
+      onKey: (e) => { if (e.key === 'Enter') this.buy(); },
+      buy: () => this.buy(),
+      buyDisabled: loading || !coins,
+      buttonLabel: loading ? 'Создаём платёж…' : 'Купить',
+      hasMessage: !!this.state.message,
+      message: this.state.message,
+      msgBg: ok ? '#e6f4ea' : '#fdecea',
+      msgColor: ok ? '#1e7e34' : '#c82333',
+      msgBorder: ok ? '#b7dfc2' : '#f5c2c7'
+    };
+  }
+}
+</script>
+{% endraw %}
+</body>
+</html>

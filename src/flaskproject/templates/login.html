@@ -68,13 +68,18 @@
         button:hover {
             background-color: #0056b3; /* Темно-синий при наведении */
         }
+
+        .form-message { display: none; margin-top: 15px; padding: 10px; border-radius: 5px; font-size: 14px; text-align: center; }
+        .form-message.success { display: block; background: #e6f4ea; color: #1e7e34; border: 1px solid #b7dfc2; }
+        .form-message.error { display: block; background: #fdecea; color: #c82333; border: 1px solid #f5c2c7; }
+        button:disabled { opacity: .6; cursor: default; }
     </style>
 </head>
 <body>
 
     <div class="login-card">
         <h2>Вход в систему</h2>
-        <form action="/user_login" method="post" id="loginForm">
+        <form action="/api/login" method="post" id="loginForm">
             <div class="form-group">
                 <label for="username">Логин или Email</label>
                 <input type="text" id="username" name="username" placeholder="Введите логин" required>
@@ -85,6 +90,7 @@
             </div>
             <button type="submit">Войти</button>
         </form>
+        <div class="form-message" id="formMessage"></div>
         <div class="switch-link">
             <a href="/">Зарегистрироваться</a>
         </div>
@@ -92,5 +98,39 @@
 
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.js" integrity="sha512-+k1pnlgt4F1H8L7t3z95o3/KO+o78INEcXTbnoJQ/F2VqDVhWoaiVml/OEHv9HsVgxUaVW+IbiZPUJQfF/YxZw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="../static/script.js"></script>
+<script>
+(function () {
+    var form = document.getElementById('loginForm');
+    var box = document.getElementById('formMessage');
+    function show(type, text) { box.className = 'form-message ' + type; box.textContent = text; }
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var data = Object.fromEntries(new FormData(form).entries());
+        
+        var btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        show('success', 'Отправка…');
+        try {
+            var res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify(data)
+            });
+            var body = {};
+            try { body = await res.json(); } catch (_) {}
+            if (res.ok && body.success !== false) {
+                show('success', body.message || 'Вы успешно вошли');
+                setTimeout(function () { window.location.href = body.redirect || '/chat'; }, 1200);
+            } else {
+                show('error', body.message || body.error || 'Ошибка ' + res.status);
+            }
+        } catch (err) {
+            show('error', 'Сервер недоступен. Попробуйте позже.');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+})();
+</script>
 </html>
